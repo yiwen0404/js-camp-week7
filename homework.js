@@ -23,7 +23,7 @@ const ADMIN_TOKEN = process.env.API_KEY;
  * @returns {string} - 格式 'YYYY/MM/DD HH:mm'，例如 '2024/01/01 08:00'
  */
 function formatOrderDate(timestamp) {
-  // 請實作此函式
+  return dayjs.unix(timestamp).format('YYYY/MM/DD HH:mm');
   // 提示：dayjs.unix(timestamp).format('YYYY/MM/DD HH:mm')
 }
 
@@ -33,7 +33,15 @@ function formatOrderDate(timestamp) {
  * @returns {string} - 例如 '3 天前' 或 '今天'
  */
 function getDaysAgo(timestamp) {
-  // 請實作此函式
+  const now = dayjs();
+  const orderDate = dayjs.unix(timestamp);
+  const daysAgo = now.diff(orderDate, 'day');
+  if(daysAgo > 0){
+    return `這筆訂單是 ${daysAgo} 天前`;
+  }
+  if(daysAgo === 0){
+    return '今天';
+  }
   // 提示：
   // 1. 用 dayjs() 取得今天
   // 2. 用 dayjs.unix(timestamp) 取得訂單日期
@@ -46,7 +54,10 @@ function getDaysAgo(timestamp) {
  * @returns {boolean} - 超過 7 天回傳 true
  */
 function isOrderOverdue(timestamp) {
-  // 請實作此函式
+  const now = dayjs();
+  const orderDate = dayjs.unix(timestamp);
+  const isOverdue = now.diff(orderDate, 'day') > 7;
+  return isOverdue;
 }
 
 /**
@@ -55,7 +66,12 @@ function isOrderOverdue(timestamp) {
  * @returns {Array} - 篩選出 createdAt 在本週的訂單
  */
 function getThisWeekOrders(orders) {
-  // 請實作此函式
+  const weekStart = dayjs().startOf('week'); 
+  const weekEnd = dayjs().endOf('week'); 
+  return orders.filter(function(order){
+    const someDate = dayjs.unix(order.createdAt); 
+    return someDate.isBefore(weekEnd) && someDate.isAfter(weekStart); 
+  });
   // 提示：
   // 1. 用 dayjs().startOf('week') 取得本週開始
   // 2. 用 dayjs().endOf('week') 取得本週結束
@@ -79,7 +95,36 @@ function getThisWeekOrders(orders) {
  * - payment: 必須是 'ATM', 'Credit Card', 'Apple Pay' 其中之一
  */
 function validateOrderUser(data) {
-  // 請實作此函式
+  const telRegex = /^09\d{8}$/;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const validPayments = ["ATM", "Credit Card", "Apple Pay"];
+  const errors = [];
+
+  if(!data.name || data.name.trim() === ''){
+    errors.push('姓名不可為空白');
+  }
+
+  if(!data.address || data.address.trim() === ''){
+    errors.push('地址不可為空白');
+  }
+
+  if(!telRegex.test(data.tel)){
+    errors.push('電話必須是 09 開頭的 10 位數字');
+  }
+  
+  if(!emailRegex.test(data.email)){
+    errors.push('email格式不正確');
+  }
+
+  if(!validPayments.includes(data.payment)){
+    errors.push('payment必須是 ATM, Credit Card, Apple Pay其中之一');
+  }
+
+  return{
+    isValid: errors.length === 0,
+    errors
+  };
+
 }
 
 /**
@@ -93,7 +138,16 @@ function validateOrderUser(data) {
  * - 不可大於 99
  */
 function validateCartQuantity(quantity) {
-  // 請實作此函式
+  if(!Number.isInteger(quantity) || quantity < 1 || quantity > 99){
+    return{
+      isValid: false,
+      error: '數量必須是 1~99 的正整數'
+    };
+  }
+
+  return {
+    isValid: true
+  };
 }
 
 // ========================================
@@ -105,7 +159,7 @@ function validateCartQuantity(quantity) {
  * @returns {string} - 格式 'ORD-xxxxxxxx'
  */
 function generateOrderId() {
-  // 請實作此函式
+  return `ORD- ${Date.now().toString(36) + Math.random().toString(36).slice(2)}`;
   // 提示：可以用 Date.now().toString(36) + Math.random().toString(36).slice(2)
 }
 
@@ -114,7 +168,7 @@ function generateOrderId() {
  * @returns {string} - 格式 'CART-xxxxxxxx'
  */
 function generateCartItemId() {
-  // 請實作此函式
+  return `CART- ${Date.now().toString(36) + Math.random().toString(36).slice(2)}`;
 }
 
 // ========================================
@@ -126,7 +180,8 @@ function generateCartItemId() {
  * @returns {Promise<Array>} - 回傳 products 陣列
  */
 async function getProductsWithAxios() {
-  // 請實作此函式
+  const response = await axios.get(`${BASE_URL}/api/livejs/v1/customer/${API_PATH}/products`);
+  return response.data.products;
   // 提示：axios.get() 會自動解析 JSON，不需要 .json()
   // 回傳 response.data.products
 }
@@ -138,7 +193,13 @@ async function getProductsWithAxios() {
  * @returns {Promise<Object>} - 回傳購物車資料
  */
 async function addToCartWithAxios(productId, quantity) {
-  // 請實作此函式
+  const response = await axios.post(
+    `${BASE_URL}/api/livejs/v1/customer/${API_PATH}/carts`,
+    {
+      data:{productId, quantity}
+    }
+  );
+  return response.data;
   // 提示：axios.post(url, data) 會自動設定 Content-Type
 }
 
@@ -147,18 +208,25 @@ async function addToCartWithAxios(productId, quantity) {
  * @returns {Promise<Array>} - 回傳訂單陣列
  */
 async function getOrdersWithAxios() {
-  // 請實作此函式
+  const response = await axios.get(
+    `${BASE_URL}/api/livejs/v1/admin/${API_PATH}/orders`,
+    { headers: { authorization: ADMIN_TOKEN } }
+  );
+  return response.data.orders;
   // 提示：axios.get(url, { headers: { authorization: token } })
 }
 
 /*
 比較題：請說明 fetch 和 axios 的主要差異
 
-1. ____________________________________
+1. JSON 解析：fetch 需要手動呼叫 response.json() 解析回應，
+axios 會自動解析 JSON，直接從 response.data 取得資料
 
-2. ____________________________________
+2. 錯誤處理：fetch 只有在網路錯誤時才會 reject，HTTP 狀態碼 4xx/5xx 不會被視為錯誤；
+axios 會將 HTTP 狀態碼 4xx/5xx 視為錯誤並 reject
 
-3. ____________________________________
+3. Request 設定：fetch 需要手動設定 headers 和 JSON.stringify(body)，
+axios 會自動設定 Content-Type 並將物件轉為 JSON
 */
 
 // ========================================
@@ -178,7 +246,13 @@ const OrderService = {
    * @returns {Promise<Array>} - 訂單陣列
    */
   async fetchOrders() {
-    // 請實作此函式
+    const response = await axios.get(
+      `${this.baseURL}/api/livejs/v1/admin/${this.apiPath}/orders`,
+      {
+        headers: { authorization: this.token },
+      },
+    );
+    return response.data.orders;
   },
 
   /**
@@ -187,7 +261,11 @@ const OrderService = {
    * @returns {Array} - 為每筆訂單加上 formattedDate 欄位
    */
   formatOrders(orders) {
-    // 請實作此函式
+    return orders.map((order) => ({
+      ...order,
+      formattedDate: dayjs.unix(order.createdAt).format("YYYY/MM/DD HH:mm"),
+      daysAgo: getDaysAgo(order.createdAt),
+    }));
   },
 
   /**
@@ -196,7 +274,8 @@ const OrderService = {
    * @returns {Array} - paid: false 的訂單
    */
   filterUnpaidOrders(orders) {
-    // 請實作此函式
+    return orders.filter(function(order){
+      return order.paid === false});
   },
 
   /**
